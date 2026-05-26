@@ -22,13 +22,11 @@ class ArucoDetector:
         self.log     = RobotLogger(node)
         self.bridge  = CvBridge()
 
-        aruco_dict   = cv2.aruco.getPredefinedDictionary(
+        self.aruco_dict   = cv2.aruco.getPredefinedDictionary(
             getattr(cv2.aruco, ARUCO_CONFIG["dict"]))
-        params = cv2.aruco.DetectorParameters()
-        params.minMarkerPerimeterRate = 0.05  # 너무 작은 마커 무시
-        params.errorCorrectionRate    = 0.5   # 오류 허용 낮춰서 오감지 감소
-        self.detector = cv2.aruco.ArucoDetector(
-            aruco_dict, params)
+        self.aruco_params = cv2.aruco.DetectorParameters_create()
+        self.aruco_params.minMarkerPerimeterRate = 0.05
+        self.aruco_params.errorCorrectionRate    = 0.5
 
         self.marker_size = ARUCO_CONFIG["marker_size"]
         self.approach    = ARUCO_CONFIG["approach_distance"]
@@ -56,7 +54,7 @@ class ArucoDetector:
             image_msg, desired_encoding="bgr8")
         gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-        corners, ids, _ = self.detector.detectMarkers(gray)
+        corners, ids, _ = cv2.aruco.detectMarkers(gray, self.aruco_dict, parameters=self.aruco_params)
         if ids is None:
             self._seen_ids.clear()
             return []

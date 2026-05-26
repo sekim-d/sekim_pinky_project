@@ -1,18 +1,17 @@
 # core/robot_controller.py
 # 메인 컨트롤러 — 모든 모듈 통합
 
-import math
 import threading
 
 import rclpy
 import uvicorn
 from fastapi import FastAPI
-from geometry_msgs.msg import Twist, PoseWithCovarianceStamped
+from geometry_msgs.msg import Twist
 from pydantic import BaseModel
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
 
-from config.settings import ROBOT_CONFIG, ARUCO_CONFIG, LOCATIONS
+from config.settings import ROBOT_CONFIG, ARUCO_CONFIG, WAYPOINTS
 from navigation.nav_manager import NavManager
 from navigation.slam_manager import SlamManager
 from sensors.sensor_manager import SensorManager
@@ -75,40 +74,10 @@ class RobotController(Node):
         # ── 비전 루프 타이머 (10Hz) ─────────────────
         self.create_timer(0.1, self._vision_loop)
 
-        # ── AMCL 초기 위치 설정 (2초 후) ───────────
-        self._init_pose_pub   = self.create_publisher(
-            PoseWithCovarianceStamped, "/initialpose", 1)
-        self._init_pose_timer = self.create_timer(2.0, self._publish_initial_pose)
-
         # ── HTTP API 서버 시작 ─────────────────────
         self._start_api_server(cfg["api_port"])
 
         self.log.info("SYS", "모든 모듈 초기화 완료")
-
-    # ── AMCL 초기 위치 ────────────────────────────
-    def _publish_initial_pose(self):
-        home = LOCATIONS.get("home", {"x": 0.0, "y": 0.0, "yaw": 0.0})
-        msg  = PoseWithCovarianceStamped()
-        msg.header.frame_id = "map"
-        msg.header.stamp    = self.get_clock().now().to_msg()
-
-        msg.pose.pose.position.x = home["x"]
-        msg.pose.pose.position.y = home["y"]
-
-        yaw = home["yaw"]
-        msg.pose.pose.orientation.z = math.sin(yaw / 2)
-        msg.pose.pose.orientation.w = math.cos(yaw / 2)
-
-        # 좁은 초기 불확실성 — 항상 home에서 시작하므로 확신 있게 설정
-        msg.pose.covariance[0]  = 0.02   # x ±14cm
-        msg.pose.covariance[7]  = 0.02   # y ±14cm
-        msg.pose.covariance[35] = 0.02   # yaw ±8°
-
-        self._init_pose_pub.publish(msg)
-        if hasattr(self, '_init_pose_timer') and self._init_pose_timer:
-            self._init_pose_timer.cancel()
-            self._init_pose_timer = None
-        self.log.info("SYS", "AMCL 초기 위치 설정 완료 → home")
 
     # ── API 서버 ───────────────────────────────────
     def _start_api_server(self, port: int):
@@ -261,7 +230,12 @@ class RobotController(Node):
             if self._target_marker_id is not None:
                 self.log.info("SYS",
                     f"목적지 {location} → 마커 {self._target_marker_id} 정밀 정차 대기")
-            self.nav.go_to_location(location, callback=self._on_nav_done)
+            if location in WAYPOINTS:
+                self.log.info("SYS",
+                    f"웨이포인트 경로 이동 ({len(WAYPOINTS[location])}개)")
+                self.nav.go_through(WAYPOINTS[location], callback=self._on_nav_done)
+            else:
+                self.nav.go_to_location(location, callback=self._on_nav_done)
 
         elif action == "dock":
             self.nav.dock_to_marker(

@@ -13,9 +13,8 @@ class CeilingCamera:
         self.marker_map  = cfg["marker_map"]
         self.zones       = cfg["zones"]
 
-        aruco_dict       = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
-        aruco_params     = cv2.aruco.DetectorParameters()
-        self.detector    = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
+        self.aruco_dict   = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+        self.aruco_params = cv2.aruco.DetectorParameters_create()
 
         self.robot_zones: dict[str, int] = {}
 
@@ -54,7 +53,7 @@ class CeilingCamera:
                 continue
 
             h, w = frame.shape[:2]
-            corners, ids, _ = self.detector.detectMarkers(frame)
+            corners, ids, _ = cv2.aruco.detectMarkers(frame, self.aruco_dict, parameters=self.aruco_params)
 
             if ids is not None:
                 for i, marker_id in enumerate(ids.flatten()):

@@ -2,10 +2,11 @@
 # YOLO 객체 감지 (사람, 박스)
 
 from cv_bridge import CvBridge
-from ultralytics import YOLO
-
 from config.settings import YOLO_CONFIG
 from utils.logger import RobotLogger
+
+if YOLO_CONFIG.get("enabled", False):
+    from ultralytics import YOLO
 
 
 class YoloDetector:
@@ -21,9 +22,9 @@ class YoloDetector:
         self.log    = RobotLogger(node)
         self.bridge = CvBridge()
 
-        self.model   = YOLO(YOLO_CONFIG["model"])
+        self.model   = YOLO(YOLO_CONFIG["model"]) if YOLO_CONFIG.get("enabled", False) else None
         self.conf    = YOLO_CONFIG["confidence"]
-        self.classes = YOLO_CONFIG.get("classes", None)  # None이면 전체 감지
+        self.classes = YOLO_CONFIG.get("classes", None)
 
         # 외부 콜백 등록
         self.on_person_detected = None
